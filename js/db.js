@@ -345,33 +345,16 @@ const DB = {
 
     // ===== PROGRESO DEL VEHÍCULO =====
     async updateProgreso(servicioId, estadoVehiculo, observaciones, usuario) {
-        const _esErrorDeEsquema = (e) =>
-            e?.message?.includes('schema cache') ||
-            e?.message?.includes('column') ||
-            e?.code === 'PGRST204' ||
-            String(e?.message).includes('estadoVehiculo') ||
-            String(e?.message).includes('progreso');
-
-        // 1. Guardar estadoVehiculo y observaciones en el servicio
-        try {
-            const { error } = await supabase
-                .from('registro_servicio_vehiculo')
-                .update({ estadoVehiculo, observaciones: observaciones || null })
-                .eq('id', servicioId);
-
-            if (error) {
-                if (_esErrorDeEsquema(error)) {
-                    console.warn(
-                        '⚠️ La columna "estadoVehiculo" aún no existe en la BD.\n' +
-                        '   Ejecuta migrations/agregar_progreso.sql en Supabase SQL Editor.'
-                    );
-                } else {
-                    throw error;
-                }
-            }
-        } catch (e) {
-            if (!_esErrorDeEsquema(e)) throw e;
-        }
+        // Persistir etapa y estado general juntos; cualquier error impide confirmar éxito.
+        const estado = estadoVehiculo === 'entrega' ? 'Completado' : 'En Proceso';
+        const { data, error } = await supabase
+            .from('registro_servicio_vehiculo')
+            .update({ estadoVehiculo, observaciones: observaciones || null, estado })
+            .eq('id', servicioId)
+            .select()
+            .single();
+        if (error) throw error;
+        if (!data) throw new Error('No se encontró el servicio para actualizar el progreso.');
 
         // 2. Guardar en historial_progreso
         try {
@@ -387,7 +370,7 @@ const DB = {
             console.warn('⚠️ Tabla historial_progreso no existe aún.', e2?.message);
         }
 
-        return { id: servicioId, estadoVehiculo };
+        return data;
     },
 
     async getHistorialProgreso(servicioId) {

@@ -86,7 +86,6 @@ const ServiceManager = {
             await DB.updateProgreso(servicioId, estadoVehiculo, observaciones, usuario);
 
             const nuevoEstado = estadoVehiculo === 'entrega' ? 'Completado' : 'En Proceso';
-            await DB.updateServicio(servicioId, { estado: nuevoEstado });
 
             const idx = DataStore.services.findIndex(s => s.id === servicioId);
             if (idx !== -1) {

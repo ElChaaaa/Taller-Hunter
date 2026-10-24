@@ -23,7 +23,7 @@ BEGIN
     ) THEN
         -- Copiar datos existentes
         ALTER TABLE registro_servicio_vehiculo
-            ADD COLUMN IF NOT EXISTS "estadoVehiculo" VARCHAR(20) DEFAULT 'recepcion';
+            ADD COLUMN IF NOT EXISTS "estadoVehiculo" VARCHAR(20);
         UPDATE registro_servicio_vehiculo
             SET "estadoVehiculo" = progreso
             WHERE progreso IS NOT NULL;
@@ -35,7 +35,7 @@ $$;
 
 -- 1b. Agregar la columna si no existía antes (caso de base limpia)
 ALTER TABLE registro_servicio_vehiculo
-    ADD COLUMN IF NOT EXISTS "estadoVehiculo" VARCHAR(20) DEFAULT 'recepcion'
+    ADD COLUMN IF NOT EXISTS "estadoVehiculo" VARCHAR(20)
     CHECK ("estadoVehiculo" IN (
         'recepcion',
         'diagnostico',
@@ -43,6 +43,11 @@ ALTER TABLE registro_servicio_vehiculo
         'calidad',
         'entrega'
     ));
+
+-- Las filas históricas sin etapa conservan NULL para derivarla de estado.
+-- Solo los servicios nuevos comienzan en recepción.
+ALTER TABLE registro_servicio_vehiculo
+    ALTER COLUMN "estadoVehiculo" SET DEFAULT 'recepcion';
 
 -- 1c. Agregar columna observaciones si no existe
 ALTER TABLE registro_servicio_vehiculo
@@ -101,14 +106,15 @@ NOTIFY pgrst, 'reload schema';
 ALTER TABLE vehiculos
     DROP CONSTRAINT IF EXISTS vehiculos_estado_check;
 
-ALTER TABLE vehiculos
-    ADD CONSTRAINT vehiculos_estado_check
-    CHECK (estado IN ('Activo', 'Inactivo', 'En Servicio', 'Vendido'));
-
 -- Normalizar filas existentes con minúsculas
 UPDATE vehiculos SET estado = 'Activo'   WHERE lower(estado) = 'activo';
 UPDATE vehiculos SET estado = 'Inactivo' WHERE lower(estado) = 'inactivo';
 UPDATE vehiculos SET estado = 'Vendido'  WHERE lower(estado) = 'vendido';
+UPDATE vehiculos SET estado = 'En Servicio' WHERE lower(estado) = 'en servicio';
+
+ALTER TABLE vehiculos
+    ADD CONSTRAINT vehiculos_estado_check
+    CHECK (estado IN ('Activo', 'Inactivo', 'En Servicio', 'Vendido'));
 
 -- ─────────────────────────────────────────────────────────────
 -- VERIFICACIÓN: ejecuta esto para confirmar que todo quedó bien
